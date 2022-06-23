@@ -1,0 +1,63 @@
+---
+title: "eurovision"
+output: html_document
+date: '2022-06-23'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Eurovision
+
+First, load library and data set
+
+```{r}
+library(dplyr)
+library(ggplot)
+
+eurovision <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-05-17/eurovision.csv')
+head(eurovision)
+```
+
+Let's find some data about how good countries are doing
+
+```{r}
+# Find possible values for sections
+unique(eurovision$section)
+# Create subset with finals
+eurovision_finals = eurovision %>% 
+  filter(section == "grand-final" | section == "final") %>% 
+  select(-section)
+
+head(eurovision_finals)
+
+# Count number of wins
+eurovision_finals %>% 
+  filter(winner == TRUE) %>% 
+  count(artist_country) %>%
+  arrange(desc(n))
+
+# Count win/attempt ratio
+eurovision_final_ratio = eurovision_finals %>%
+  group_by(artist_country) %>% 
+  summarise(
+    avg_rank = median(rank, na.rm = TRUE),
+    wins = sum(winner),
+    attempts = n()
+  ) %>% 
+  mutate(
+    w_a_ratio = round(wins / attempts, digits = 2)
+  ) %>% 
+  arrange(desc(w_a_ratio))
+
+  
+eurovision_final_ratio
+```
+
+Now visualise what we found
+
+```{r}
+
+```
+
