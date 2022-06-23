@@ -14,9 +14,19 @@ First, load library and data set
 
 ```{r}
 library(dplyr)
-library(ggplot)
+library(ggplot2)
+library(stringr)
+library(ggflags)
+library(extrafont)
+
+loadfonts(device = "all", quiet = TRUE)
 
 eurovision <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-05-17/eurovision.csv')
+
+# Extract country ISO code
+eurovision = eurovision %>% 
+  mutate(iso_country = str_sub(country_emoji, -3, -2))
+
 head(eurovision)
 ```
 
@@ -40,7 +50,7 @@ eurovision_finals %>%
 
 # Count win/attempt ratio
 eurovision_final_ratio = eurovision_finals %>%
-  group_by(artist_country) %>% 
+  group_by(artist_country, iso_country) %>% 
   summarise(
     avg_rank = median(rank, na.rm = TRUE),
     wins = sum(winner),
@@ -48,9 +58,10 @@ eurovision_final_ratio = eurovision_finals %>%
   ) %>% 
   mutate(
     w_a_ratio = round(wins / attempts, digits = 2)
-  ) %>% 
+  ) %>%
+  # Leave out Serbia & Montenegro
+  filter(!iso_country=="le") %>% 
   arrange(desc(w_a_ratio))
-
   
 eurovision_final_ratio
 ```
@@ -59,5 +70,23 @@ Now visualise what we found
 
 ```{r}
 
+
+eurovision_final_ratio %>% 
+  #filter(wins > 0) %>% 
+  ggplot(aes(x = avg_rank, y = w_a_ratio, size = attempts, country = iso_country)) +
+  labs(title = "Eurovision Song Contest: Performance by country ") +
+  geom_flag() +
+  scale_size(range = c(2, 12), name = "Appearances", breaks = c(1, 20, 60)) +
+  scale_x_reverse(name = "Median rank") +
+  scale_y_continuous(name = "% won", labels = function (y) paste(y * 100, "%", sep = "")) +
+  theme_light(base_family = "Arial, Times New Roman")
+
+ggsave(
+  "esc_performance.png", 
+  units = "px",
+  width = 1980,
+  height = 1020,
+  dpi = "print"
+)
 ```
 
