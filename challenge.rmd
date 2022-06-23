@@ -1,0 +1,123 @@
+---
+title: "challenge"
+output: html_document
+date: '2022-06-23'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# About the Bechdel test
+
+![(1) Two women (2) talk about (3) anything but men](https://researchblog.duke.edu/wp-content/uploads/2017/08/BechdelTest-768x310.jpg)
+
+# Challenge
+
+```{r}
+# load libraries (quietly stops all the messages appearing)
+library(readr, quietly = TRUE)
+library(dplyr, quietly = TRUE)
+library(DT, quietly = TRUE)
+library(ggplot2)
+library(stringr)
+
+# load imdb and bechdel
+movies_imdb <- read_csv("https://raw.githubusercontent.com/andrewmoles2/rTrainIntroduction/main/r-data-wrangling-1/data/IMDb%20movies.csv")
+
+bechdel <- read_csv("https://raw.githubusercontent.com/andrewmoles2/rTrainIntroduction/main/r-data-wrangling-1/data/raw_bechdel.csv")
+
+# fix typos
+movies_imdb = rename(movies_imdb, worldwide_gross_income = worlwide_gross_income)
+
+# rename bechdel columns
+bechdel = transmute(
+  bechdel, 
+  bechdel_score = as.factor(rating),
+  imdb_title_id = imdb_id
+)
+
+# fix imdb id key
+movies_imdb$imdb_title_id <- parse_number(movies_imdb$imdb_title_id)
+
+# join data (inner join to only get complete rows)
+imdb_bechdel <- inner_join(x = movies_imdb, y = bechdel,
+                          by = c("imdb_title_id"))
+
+# review the data
+# just looking at Alfred Hitchcock movies in this example
+imdb_bechdel %>%
+  filter(grepl("Alfred Hitchcock", director)) %>%
+  datatable()
+```
+
+Let's plot bechdel score and year
+
+```{r}
+time_plot_data = imdb_bechdel %>%
+  group_by(year) %>% 
+  summarise(
+    avg_bechdel = mean(bechdel_score),
+    count = n()
+  ) %>%
+  # Only include years with MANY films
+  filter(count >= 30)
+
+# For the mean line, unaaggregated data is used
+smooth_time_data = imdb_bechdel %>% 
+  filter(year >= min(time_plot_data$year))
+
+theme_set(theme_light())
+
+time_plot_data %>% 
+  ggplot(aes(x = year, y = avg_bechdel, size = count)) +
+  labs(title = "Bechdel score over time") +
+  geom_point(alpha = 0.5) +
+  scale_y_continuous(breaks = c(1, 2, 3), limits = c(NA, 3), name ="Average Bechdel score") +
+  scale_x_continuous(name ="Year") +
+  scale_size(breaks= c(50, 150, 300), name ="# of Films") +
+  geom_smooth(
+    data = smooth_time_data,
+    method = "gam",
+    formula = y ~ x,
+    mapping = aes(x = year, y = bechdel_score),
+    inherit.aes = FALSE
+  )
+```
+
+Maybe budget and income are interesting?
+
+```{r}
+roi_plot_data <- imdb_bechdel %>%
+  filter(year >= 1990) %>% 
+  filter(str_starts(budget, "\\$") & str_starts(worldwide_gross_income, "\\$")) %>%
+  mutate(
+    budget = parse_number(budget),
+    worldwide_gross_income = parse_number(worldwide_gross_income),
+    roi = worldwide_gross_income / budget
+  ) %>%
+  # Removing outliers
+  filter(roi <= quantile(roi, .9))
+
+# Means and medians
+bechdel_avg = roi_plot_data %>%
+  group_by(bechdel_score) %>%
+  summarise(
+    median_roi = median(roi),
+    mean_roi = mean(roi)
+  )
+
+label_percent = function(x) {
+  paste(x * 100, "%", sep = "")
+}
+
+roi_plot_data %>% 
+  ggplot(aes(x = roi, fill = year)) +
+  labs(title = "Bechdel score and commercial success", caption = "Note: A film is considered 'flopped' with a return of less than 200%", colour = "Average") +
+  geom_histogram(aes(y = ..density..), binwidth = 0.25) +
+  facet_grid(rows = vars(bechdel_score)) +
+  scale_x_continuous(breaks = c(0, 1, 2, 3, 4, 5, 6, 7), label = label_percent, name = "Undiscounted return on investment") +
+  scale_y_continuous(label = label_percent, name = "Density") +
+  geom_vline(data = bechdel_avg, aes(xintercept = median_roi, color = "Median")) +
+  geom_vline(data = bechdel_avg, aes(xintercept = mean_roi, color = "Mean"))
+```
