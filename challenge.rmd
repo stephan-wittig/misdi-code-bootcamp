@@ -33,7 +33,7 @@ movies_imdb = rename(movies_imdb, worldwide_gross_income = worlwide_gross_income
 # rename bechdel columns
 bechdel = transmute(
   bechdel, 
-  bechdel_score = as.factor(rating),
+  bechdel_score = rating,
   imdb_title_id = imdb_id
 )
 
@@ -83,6 +83,14 @@ time_plot_data %>%
     mapping = aes(x = year, y = bechdel_score),
     inherit.aes = FALSE
   )
+
+ggsave(
+  "bechdel_time.png", 
+  units = "px",
+  width = 1980,
+  height = 1020,
+  dpi = "print"
+)
 ```
 
 Maybe budget and income are interesting?
@@ -120,4 +128,12 @@ roi_plot_data %>%
   scale_y_continuous(label = label_percent, name = "Density") +
   geom_vline(data = bechdel_avg, aes(xintercept = median_roi, color = "Median")) +
   geom_vline(data = bechdel_avg, aes(xintercept = mean_roi, color = "Mean"))
+
+ggsave(
+  "bechdel_roi.png", 
+  units = "px",
+  width = 1980,
+  height = 1020,
+  dpi = "print"
+)
 ```
